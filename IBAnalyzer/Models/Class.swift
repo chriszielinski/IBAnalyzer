@@ -8,10 +8,26 @@
 
 import Foundation
 
-struct Class {
+public struct Class {
+    var path: String?
+    var line: Int?
     var outlets: [Declaration]
     var actions: [Declaration]
     var inherited: [String]
+    var segueIdentifiers: [SegueIdentifier]
+
+    init(path: String?, line: Int?, outlets: [Declaration], actions: [Declaration], inherited: [String], segueIdentifiers: [SegueIdentifier]) {
+        self.path = path
+        self.line = line
+        self.outlets = outlets
+        self.actions = actions
+        self.inherited = inherited
+        self.segueIdentifiers = segueIdentifiers
+    }
+
+    init(outlets: [Declaration], actions: [Declaration], inherited: [String], segueIdentifiers: [SegueIdentifier]) {
+        self.init(path: nil, line: nil, outlets: outlets, actions: actions, inherited: inherited, segueIdentifiers: segueIdentifiers)
+    }
 }
 
 extension Class: Equatable {

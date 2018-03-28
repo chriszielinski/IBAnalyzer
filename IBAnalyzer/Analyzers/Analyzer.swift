@@ -8,24 +8,27 @@
 
 import Foundation
 
-struct AnalyzerConfiguration {
+public struct AnalyzerConfiguration {
     let classNameToNibMap: [String: Nib]
     let classNameToClassMap: [String: Class]
     let uiKitClassNameToClassMap: [String: Class]
+    let allNibSegues: [SegueDeclaration]
 
     init(classNameToNibMap: [String: Nib],
          classNameToClassMap: [String: Class],
-         uiKitClassNameToClassMap: [String: Class] = uiKitClassNameToClass()) {
+         uiKitClassNameToClassMap: [String: Class] = uiKitClassNameToClass(),
+         allNibSegues: [SegueDeclaration]) {
         self.classNameToNibMap = classNameToNibMap
         self.classNameToClassMap = classNameToClassMap
         self.uiKitClassNameToClassMap = uiKitClassNameToClassMap
+        self.allNibSegues = allNibSegues
     }
 }
 
-protocol Issue: CustomStringConvertible {
+public protocol Issue: CustomStringConvertible {
     var isSeriousViolation: Bool { get }
 }
 
-protocol Analyzer {
+public protocol Analyzer {
     func issues(for configuration: AnalyzerConfiguration) -> [Issue]
 }

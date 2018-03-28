@@ -9,7 +9,7 @@
 import Foundation
 import SourceKittenFramework
 
-protocol SwiftParserType {
+public protocol SwiftParserType {
     func mappingForFile(at url: URL, result: inout [String: Class]) throws
     func mappingForContents(_ contents: String, result: inout [String: Class]) throws
 }
@@ -18,8 +18,11 @@ enum SwiftParserError: Error {
     case incorrectPath(path: String)
 }
 
-class SwiftParser: SwiftParserType {
-    func mappingForFile(at url: URL, result: inout [String: Class]) throws {
+public class SwiftParser: SwiftParserType {
+
+    public init() {}
+    
+    public func mappingForFile(at url: URL, result: inout [String: Class]) throws {
         if let file = File(path: url.path) {
             return try mapping(for: file, result: &result)
         } else {
@@ -27,7 +30,7 @@ class SwiftParser: SwiftParserType {
         }
     }
 
-    func mappingForContents(_ contents: String, result: inout [String: Class]) throws {
+    public func mappingForContents(_ contents: String, result: inout [String: Class]) throws {
         return try mapping(for: File(contents: contents), result: &result)
     }
 
@@ -42,19 +45,25 @@ class SwiftParser: SwiftParserType {
                                    result: inout [String: Class],
                                    file: File) {
         for structure in substructure {
+            var lineNumber: Int?
             var outlets: [Declaration] = []
             var actions: [Declaration] = []
+            var segues: [SegueIdentifier] = []
 
             if let kind = structure["key.kind"] as? String,
                 let name = structure["key.name"] as? String,
                 kind == "source.lang.swift.decl.class" || kind == "source.lang.swift.decl.extension" {
 
+                if kind == "source.lang.swift.decl.class", let byteOffset = structure["key.offset"] as? Int64 {
+                    lineNumber = file.contents.bridge().lineAndCharacter(forByteOffset: Int(byteOffset))?.line
+                }
+
                 for insideStructure in structure.substructure {
-                    if let attributes = insideStructure["key.attributes"] as? [[String: String]],
+                    if let attributes = insideStructure["key.attributes"] as? [[String: SourceKitRepresentable]],
                         let propertyName = insideStructure["key.name"] as? String {
 
                         let isOutlet = attributes.filter({ (dict) -> Bool in
-                            return dict.values.contains("source.decl.attribute.iboutlet")
+                            return dict.values.flatMap({ $0 as? String }).contains("source.decl.attribute.iboutlet")
                         }).count > 0
 
                         if isOutlet, let nameOffset64 = insideStructure["key.nameoffset"] as? Int64 {
@@ -62,7 +71,7 @@ class SwiftParser: SwiftParserType {
                         }
 
                         let isIBAction = attributes.filter({ (dict) -> Bool in
-                            return dict.values.contains("source.decl.attribute.ibaction")
+                            return dict.values.flatMap({ $0 as? String }).contains("source.decl.attribute.ibaction")
                         }).count > 0
 
                         if isIBAction, let selectorName = insideStructure["key.selector_name"] as? String,
@@ -70,6 +79,7 @@ class SwiftParser: SwiftParserType {
                             actions.append(Declaration(name: selectorName, file: file, offset: nameOffset64))
                         }
                     }
+
                 }
 
                 parseSubstructure(structure.substructure, result: &result, file: file)
@@ -77,9 +87,12 @@ class SwiftParser: SwiftParserType {
                 let existing = result[name]
 
                 // appending needed because of extensions
-                result[name] = Class(outlets: outlets + (existing?.outlets ?? []),
-                                              actions: actions + (existing?.actions ?? []),
-                                              inherited: inherited + (existing?.inherited ?? []))
+                result[name] = Class(path: file.path,
+                                     line: lineNumber,
+                                     outlets: outlets + (existing?.outlets ?? []),
+                                     actions: actions + (existing?.actions ?? []),
+                                     inherited: inherited + (existing?.inherited ?? []),
+                                     segueIdentifiers: segues + (existing?.segueIdentifiers ?? []))
             }
         }
     }

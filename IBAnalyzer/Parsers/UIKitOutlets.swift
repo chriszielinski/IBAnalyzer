@@ -45,7 +45,7 @@ func uiKitClassNameToClass() -> [String: Class] {
         for outlet in outlets {
             outletArray.append(Declaration(name: outlet, line: 0, column: 0))
         }
-        dict[name] = Class(outlets: outletArray, actions: [], inherited: [])
+        dict[name] = Class(outlets: outletArray, actions: [], inherited: [], segueIdentifiers: [])
     }
 
     return dict

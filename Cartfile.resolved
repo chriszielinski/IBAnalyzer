@@ -1,0 +1,5 @@
+github "chriszielinski/SwiftLint" "c3beaaa1f0faf296b213df10b23ee7c694306602"
+github "drmohundro/SWXMLHash" "4.6.0"
+github "jpsim/SourceKitten" "0.19.1"
+github "jpsim/Yams" "0.5.0"
+github "scottrhoyt/SwiftyTextTable" "0.8.0"

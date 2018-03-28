@@ -1,0 +1,2 @@
+github "chriszielinski/SwiftLint.git" "master"
+github "jpsim/SourceKitten" ~> 0.19.1

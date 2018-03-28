@@ -9,14 +9,14 @@
 import Foundation
 import SourceKittenFramework
 
-class Runner {
+public class Runner {
     let path: String
     let directoryEnumerator: DirectoryContentsEnumeratorType
     let nibParser: NibParserType
     let swiftParser: SwiftParserType
     let fileManager: FileManager
 
-    init(path: String,
+    public init(path: String,
          directoryEnumerator: DirectoryContentsEnumeratorType = DirectoryContentsEnumerator(),
          nibParser: NibParserType = NibParser(),
          swiftParser: SwiftParserType = SwiftParser(),
@@ -28,7 +28,7 @@ class Runner {
         self.fileManager = fileManager
     }
 
-    func issues(using analyzers: [Analyzer]) throws -> [Issue] {
+    public func issues(using analyzers: [Analyzer], additionalClassData: Data? = nil) throws -> [Issue] {
         var classNameToNibMap: [String: Nib] = [:]
         var classNameToClassMap: [String: Class] = [:]
 
@@ -43,9 +43,24 @@ class Runner {
             try swiftParser.mappingForFile(at: url, result: &classNameToClassMap)
         }
 
+        var allSegueDeclarations: [SegueDeclaration] = classNameToNibMap.values.reduce(into: []) { $0.append(contentsOf: $1.segues) }
+        allSegueDeclarations.forEach({ $0.resolveFile(classNameToClassMap: classNameToClassMap) })
+
+        if let data = additionalClassData, let classNameToSegueIdentifiers = try? JSONDecoder().decode([String: [SegueIdentifier]].self, from: data) {
+            for (className, identifiers) in classNameToSegueIdentifiers {
+                if classNameToClassMap[className] != nil {
+                    classNameToClassMap[className]!.segueIdentifiers.append(contentsOf: identifiers)
+                } else {
+                    let classObject = Class(outlets: [], actions: [], inherited: [], segueIdentifiers: identifiers)
+                    classNameToClassMap[className] = classObject
+                }
+            }
+        }
+
         let configuration = AnalyzerConfiguration(classNameToNibMap: classNameToNibMap,
                                                   classNameToClassMap: classNameToClassMap,
-                                                  uiKitClassNameToClassMap: uiKitClassNameToClass())
+                                                  uiKitClassNameToClassMap: uiKitClassNameToClass(),
+                                                  allNibSegues: (nibParser as? NibParser)?.allSegues ?? [])
 
         return analyzers.flatMap { $0.issues(for: configuration) }
     }

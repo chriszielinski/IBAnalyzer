@@ -8,13 +8,15 @@
 
 import Foundation
 
-protocol DirectoryContentsEnumeratorType {
+public protocol DirectoryContentsEnumeratorType {
     func files(at url: URL, fileManager: FileManager) throws -> [URL]
 }
 
-struct DirectoryContentsEnumerator: DirectoryContentsEnumeratorType {
+public struct DirectoryContentsEnumerator: DirectoryContentsEnumeratorType {
 
-    func files(at url: URL, fileManager: FileManager = FileManager.default) throws -> [URL] {
+    public init() {}
+
+    public func files(at url: URL, fileManager: FileManager = FileManager.default) throws -> [URL] {
         guard let enumerator = fileManager.enumerator(at: url,
                                                       includingPropertiesForKeys: [],
                                                       options: [],

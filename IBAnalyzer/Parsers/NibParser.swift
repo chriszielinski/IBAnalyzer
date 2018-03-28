@@ -8,18 +8,36 @@
 
 import Foundation
 
-protocol NibParserType {
+public protocol NibParserType {
     func mappingForFile(at url: URL) throws -> [String: Nib]
 }
 
-class NibParser: NibParserType {
-    func mappingForFile(at url: URL) throws -> [String: Nib] {
+public class NibParser: NibParserType {
+
+    var allSegues: [SegueDeclaration]
+
+    public init() {
+        allSegues = []
+    }
+
+    public func mappingForFile(at url: URL) throws -> [String: Nib] {
         let parser = XMLParser(data: try Data(contentsOf: url))
 
         let delegate = ParserDelegate()
         delegate.url = url
         parser.delegate = delegate
         parser.parse()
+
+        allSegues = delegate.allSegues
+
+        let keyValues = delegate.tmp
+        print("\(delegate.tmpCount) segues")
+        for (key, valueList) in keyValues {
+            print("\n\n\(key) (\(valueList.count))")
+            for value in valueList {
+                print("\t\(value)")
+            }
+        }
 
         return delegate.classNameToNibMap
     }
@@ -41,6 +59,22 @@ private class ParserDelegate: NSObject, XMLParserDelegate {
 
     var classNameToNibMap: [String: Nib] = [:]
     var idToCustomClassMap: [String: String] = [:]
+    var allSegues: [SegueDeclaration] = []
+
+    var tmp: [String: [String]] = [:]
+    var tmpCount = 0
+
+    func parserDidEndDocument(_ parser: XMLParser) {
+//        for (_, nib) in classNameToNibMap {
+//            var unwindSegues: [SegueDeclaration] = []
+//            var exitSegues: [SegueDeclaration] = []
+//            for segue in nib.segues {
+//                if segue.unwindAction != nil {
+//                    unwindSegues.append(segue)
+//                }
+//            }
+//        }
+    }
 
     @objc func parser(_ parser: XMLParser, didStartElement elementName: String,
                       namespaceURI: String?, qualifiedName qName: String?,
@@ -58,7 +92,7 @@ private class ParserDelegate: NSObject, XMLParserDelegate {
                     break
             }
 
-            let outlet = Declaration(name: property, line: parser.lineNumber, column: parser.columnNumber, url: url)
+            let outlet = Declaration(name: property, line: parser.lineNumber, column: parser.columnNumber, url: url, customClass: customClassName)
             classNameToNibMap[customClassName]?.outlets.append(outlet)
         case "action" where inConnections:
             guard let selector = attributeDict["selector"],
@@ -68,6 +102,36 @@ private class ParserDelegate: NSObject, XMLParserDelegate {
             }
             let action = Declaration(name: selector, line: parser.lineNumber, column: parser.columnNumber, url: url)
             classNameToNibMap[customClassName]?.actions.append(action)
+        case "segue" where inConnections:
+            guard let destination = attributeDict["destination"],
+                let customClassName = stack.reversed().first(where: { $0.customClassName != nil })?.customClassName
+                else {
+                    print("CANT FIND CUSTOM CLASS FOR SEGUE: \(attributeDict)")
+                    break
+            }
+
+            print("SEGUE!!!: \(attributeDict)")
+
+            let segue = SegueDeclaration(attributes: attributeDict)
+            segue.parentClassName = customClassName
+
+            if let className = idToCustomClassMap[destination] {
+                segue.destinationClassName = className
+            }
+
+            classNameToNibMap[customClassName]!.segues.append(segue)
+            allSegues.append(segue)
+
+            print("\t\tbelongs to \(customClassName)")
+
+//            for (key, value) in attributeDict {
+//                if tmp[key] == nil {
+//                    tmp[key] = [value]
+//                } else {
+//                    tmp[key]!.append(value)
+//                }
+//            }
+//            tmpCount += 1
         case let tag where (inObjects && tag != "viewControllerPlaceholder"):
             let customClass = attributeDict["customClass"]
             let id = attributeDict["id"]
@@ -75,7 +139,7 @@ private class ParserDelegate: NSObject, XMLParserDelegate {
 
             if let customClass = customClass, let id = id {
                 idToCustomClassMap[id] = customClass
-                classNameToNibMap[customClass] = Nib(outlets: [], actions: [])
+                classNameToNibMap[customClass] = Nib(outlets: [], actions: [], segues: [])
             }
         default:
             break
@@ -90,7 +154,7 @@ private class ParserDelegate: NSObject, XMLParserDelegate {
             assert(stack.count == 0)
         case "connections":
             inConnections = false
-        case "outlet", "outletCollection", "action":
+        case "outlet", "outletCollection", "action", "segue":
             break
         case let tag where (inObjects && tag != "viewControllerPlaceholder"):
             stack.removeLast()

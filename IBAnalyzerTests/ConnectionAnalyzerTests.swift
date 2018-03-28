@@ -17,6 +17,16 @@ extension ConnectionIssue: Equatable {
 }
 
 class ConnectionAnalyzerTests: XCTestCase {
+
+    /// Default configuration.
+    override func tearDown() {
+        Configuration.shared.configuration = [
+            .ignoreOptionalProperty: false,
+            .reportMissingAsError: false,
+            .reportMissingToController: false
+        ]
+    }
+
     func testNoOutletsAndActions() {
         let nib = Nib(outlets: [], actions: [])
         let klass = Class(outlets: [], actions: [], inherited: [])
@@ -25,23 +35,56 @@ class ConnectionAnalyzerTests: XCTestCase {
         XCTAssertEqual(issues(for: configuration), [])
     }
 
-    func testMissingOutlet() {
+    func testMissingOutletWarning() {
         let label = Declaration(name: "label", line: 1, column: 0)
         let nib = Nib(outlets: [label], actions: [])
         let klass = Class(outlets: [], actions: [], inherited: [])
         let configuration = AnalyzerConfiguration(classNameToNibMap: ["A": nib],
                                                   classNameToClassMap: ["A": klass])
-        XCTAssertEqual(issues(for: configuration), [ConnectionIssue.missingOutlet(className: "A", outlet: label)])
+        let connectionIssues = issues(for: configuration)
+        XCTAssertEqual(connectionIssues, [ConnectionIssue.missingOutlet(className: "A", outlet: label)])
+        XCTAssertEqual(connectionIssues.first!.description, "label:1:0: warning: IBOutlet missing: label is not connected in A")
     }
 
-    func testMissingAction() {
+    func testMissingOutletError() {
+        let label = Declaration(name: "label", line: 1, column: 0)
+        let nib = Nib(outlets: [label], actions: [])
+        let klass = Class(outlets: [], actions: [], inherited: [])
+        let configuration = AnalyzerConfiguration(classNameToNibMap: ["A": nib],
+                                                  classNameToClassMap: ["A": klass])
+
+        Configuration.shared.configuration[.reportMissingAsError] = true
+
+        let connectionIssues = issues(for: configuration)
+        XCTAssertEqual(connectionIssues, [ConnectionIssue.missingOutlet(className: "A", outlet: label)])
+        XCTAssertEqual(connectionIssues.first!.description, "label:1:0: error: IBOutlet missing: label is not connected in A")
+    }
+
+    func testMissingActionWarning() {
         let didTapButton = Declaration(name: "didTapButton:", line: 1, column: 0)
         let nib = Nib(outlets: [], actions: [didTapButton])
         let klass = Class(outlets: [], actions: [], inherited: [])
         let configuration = AnalyzerConfiguration(classNameToNibMap: ["A": nib],
                                                   classNameToClassMap: ["A": klass])
-        XCTAssertEqual(issues(for: configuration),
+        let connectionIssues = issues(for: configuration)
+        XCTAssertEqual(connectionIssues,
                        [ConnectionIssue.missingAction(className: "A", action: didTapButton)])
+        XCTAssertEqual(connectionIssues.first!.description, "didTapButton:1:0: warning: IBAction missing: didTapButton: is not implemented in A")
+    }
+
+    func testMissingActionError() {
+        let didTapButton = Declaration(name: "didTapButton:", line: 1, column: 0)
+        let nib = Nib(outlets: [], actions: [didTapButton])
+        let klass = Class(outlets: [], actions: [], inherited: [])
+        let configuration = AnalyzerConfiguration(classNameToNibMap: ["A": nib],
+                                                  classNameToClassMap: ["A": klass])
+
+        Configuration.shared.configuration[.reportMissingAsError] = true
+
+        let connectionIssues = issues(for: configuration)
+        XCTAssertEqual(connectionIssues,
+                       [ConnectionIssue.missingAction(className: "A", action: didTapButton)])
+        XCTAssertEqual(connectionIssues.first!.description, "didTapButton:1:0: error: IBAction missing: didTapButton: is not implemented in A")
     }
 
     func testUnnecessaryOutlet() {
